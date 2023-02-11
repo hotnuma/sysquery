@@ -20,7 +20,7 @@ bool _have_swap_pss = false;
 // MemItem --------------------------------------------------------------------
 
 typedef struct _MemItem MemItem;
-MemItem* mitem_new(const char *name, int pid);
+MemItem* mitem_new(const char *name);
 void mitem_free(MemItem *item);
 
 // MemList --------------------------------------------------------------------
@@ -30,7 +30,7 @@ MemList* mlist_new();
 void mlist_free(MemList *list);
 int mlist_size(MemList *list);
 MemItem* mlist_at(MemList *list, int i);
-MemItem* mlist_get_item(MemList *list, const char *name, int pid, bool *exists);
+MemItem* mlist_get_item(MemList *list, const char *name, bool *exists);
 void mlist_print(MemList *list);
 
 // PrcItem --------------------------------------------------------------------
@@ -64,6 +64,7 @@ struct _MemItem
     CString *name;
 
     int pid;
+    CString *uid_name;
 
     long priv;
     long shared;
@@ -75,13 +76,14 @@ struct _MemItem
     int count;
 };
 
-MemItem* mitem_new(const char *name, int pid)
+MemItem* mitem_new(const char *name)
 {
     MemItem *item = (MemItem*) malloc(sizeof(MemItem));
 
     item->name = cstr_new(name);
 
-    item->pid = pid;
+    item->pid = 0;
+    item->uid_name = cstr_new_size(24);
 
     item->priv = 0;
     item->shared = 0;
@@ -149,7 +151,7 @@ MemItem* mlist_at(MemList *list, int i)
     return (MemItem*) clist_at(list->list, i);
 }
 
-MemItem* mlist_get_item(MemList *list, const char *name, int pid, bool *exists)
+MemItem* mlist_get_item(MemList *list, const char *name, bool *exists)
 {
     *exists = false;
 
@@ -166,7 +168,7 @@ MemItem* mlist_get_item(MemList *list, const char *name, int pid, bool *exists)
         }
     }
 
-    MemItem *item = mitem_new(name, pid);
+    MemItem *item = mitem_new(name);
     clist_append(list->list, item);
 
     return item;
@@ -185,9 +187,19 @@ void mlist_print(MemList *list)
         MemItem *item = mlist_at(list, i);
 
         if (item->count > 1)
-            print("%s(%d)\t%d\t%ld", c_str(item->name), item->count, item->pid, item->total);
+        {
+            print("%s(%d)\t%d\t%s\t%ld", c_str(item->name), item->count,
+                                     item->pid,
+                                     c_str(item->uid_name),
+                                     item->total);
+        }
         else
-            print("%s\t%d\t%ld", c_str(item->name), item->pid, item->total);
+        {
+            print("%s\t%d\t%s\t%ld", c_str(item->name),
+                                 item->pid,
+                                 c_str(item->uid_name),
+                                 item->total);
+        }
 
         total += item->total;
     }
@@ -551,8 +563,13 @@ bool plist_append(PrcList *list, long pid)
     bool exists = false;
     MemItem *memitem = mlist_get_item(list->memlist,
                                       c_str(item->name),
-                                      item->pid,
                                       &exists);
+
+    if (!exists)
+    {
+        memitem->pid = item->pid;
+        cstr_copy(memitem->uid_name, c_str(item->uid_name));
+    }
 
     assert(memitem != NULL);
 
