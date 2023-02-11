@@ -4,6 +4,7 @@
 #include <cfile.h>
 #include <clist.h>
 #include <libstr.h>
+#include <libmacros.h>
 #include <print.h>
 
 #include <libgen.h>
@@ -587,8 +588,59 @@ bool plist_append(PrcList *list, long pid)
     return true;
 }
 
+bool cstr_ellipsize(CString *cstr, const char *str, int length)
+{
+    int inlen = strlen(str);
+    if (inlen == length)
+    {
+        cstr_copy(cstr, str);
+        return true;
+    }
+
+    int partlen = 1;
+    int len = length - partlen;
+
+    if (inlen < 1 || len < 1)
+        return false;
+
+    cstr_copy_len(cstr, str, MIN(inlen, len));
+
+    if (inlen >= length)
+        cstr_append(cstr, "+");
+
+    int diff = length - cstr_size(cstr);
+
+    for (int i = 0; i < diff; ++i)
+    {
+        cstr_append_c(cstr, ' ');
+    }
+
+    return true;
+}
+
+bool cstr_long(CString *cstr, long val, int pad)
+{
+    CStringAuto *temp = cstr_new_size(16);
+    cstr_fmt(temp, "%ld", val);
+
+    cstr_clear(cstr);
+
+    int diff = pad - cstr_size(temp);
+
+    for (int i = 0; i < diff; ++i)
+    {
+        cstr_append_c(cstr, ' ');
+    }
+
+    cstr_append(cstr, c_str(temp));
+
+    return true;
+}
+
 void plist_print(PrcList *list)
 {
+    CStringAuto *buff = cstr_new_size(64);
+
     clist_sort(list->list, (CCompareFunc) _pi_cmpmem);
 
     long total = 0;
@@ -599,7 +651,20 @@ void plist_print(PrcList *list)
     {
         PrcItem *item = plist_at(list, i);
 
-        print("%s %ld", c_str(item->name), item->total);
+        // name
+        cstr_ellipsize(buff, c_str(item->name), 17);
+        printf("%s", c_str(buff));
+
+        cstr_long(buff, item->pid, 7);
+        printf(" %s", c_str(buff));
+
+        cstr_ellipsize(buff, c_str(item->uid_name), 16);
+        printf(" %s", c_str(buff));
+
+        cstr_long(buff, item->total, 7);
+        printf(" %s", c_str(buff));
+
+        printf("\n");
 
         total += item->total;
     }
@@ -616,8 +681,8 @@ bool prc_query()
 
     plist_parse(list);
 
-    //plist_print(list);
-    mlist_print(list->memlist);
+    //mlist_print(list->memlist);
+    plist_print(list);
 
     return true;
 }
