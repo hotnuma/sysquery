@@ -1,5 +1,75 @@
 #if 0
 
+#define SEP_TAB     "\t"
+#define SEP_SPACE   " "
+#define COL_UNIT    26
+#define COL6        6
+#define COL7        7
+
+static bool writeHeaderTxt(CFile *outfile);
+bool writeLineTxt(CFile *outfile);
+
+bool SvcEntry::writeHeaderTxt(CFile &outfile)
+{
+    CString col;
+
+    col = "Unit";
+    strPadRight(col, COL_UNIT, ' ');
+    outfile << col;
+
+    outfile << SEP_SPACE;
+
+    col = "Sub";
+    strPadRight(col, COL7, ' ');
+    outfile << col;
+
+    outfile << SEP_SPACE;
+
+    outfile << "Description";
+
+    outfile << "\n";
+
+    return true;
+}
+
+bool SvcEntry::writeLineTxt(CFile &outfile)
+{
+    strEllipsize(unit, COL_UNIT, "+");
+    strPadRight(unit, COL_UNIT, ' ');
+    outfile << unit;
+
+    outfile << SEP_SPACE;
+
+    strEllipsize(sub, COL7, "+");
+    strPadRight(sub, COL7, ' ');
+    outfile << sub;
+
+    outfile << SEP_SPACE;
+
+    outfile << description;
+
+    outfile << "\n";
+
+    return true;
+}
+
+bool SvcEntry::writeLineCsv(CFile &outfile)
+{
+    outfile << unit;
+    outfile << SEP_TAB;
+    outfile << user;
+    outfile << SEP_TAB;
+    outfile << pid;
+    outfile << SEP_TAB;
+    outfile << command;
+
+    outfile << "\n";
+
+    return true;
+}
+
+// ----------------------------------------------------------------------------
+
 char buffer[1024];
 unsigned int dummy;
 

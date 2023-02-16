@@ -11,65 +11,54 @@
 
 #include <ctype.h>
 
-//#define SEP_TAB     "\t"
-//#define SEP_SPACE   " "
-//#define COL_UNIT    26
-//#define COL6        6
-//#define COL7        7
-
-
 // SvcEntry -------------------------------------------------------------------
 
 typedef struct _SvcEntry SvcEntry;
-SvcEntry* svce_new();
-void svce_free(SvcEntry *entry);
-bool svce_parse(SvcEntry *entry, CString *line);
-
-//static bool writeHeaderTxt(CFile *outfile);
-//bool writeLineTxt(CFile *outfile);
+SvcEntry* sve_new();
+void sve_free(SvcEntry *entry);
+bool sve_parse(SvcEntry *entry, CString *line);
+void sve_print(SvcEntry *entry, CString *buffer);
 
 // SvcList --------------------------------------------------------------------
 
 typedef struct _SvcList SvcList;
-SvcList* svcl_new();
-void svcl_free(SvcList *list);
-bool svcl_query(SvcList *list);
-bool svcl_print(SvcList *list);
-
+SvcList* svl_new();
+void svl_free(SvcList *list);
+bool svl_query(SvcList *list);
+bool svl_print(SvcList *list);
 
 // SvcEntry -------------------------------------------------------------------
 
 struct _SvcEntry
 {
     CString *unit;
-    CString *sub;
+    bool running;
     CString *description;
 };
 
-SvcEntry* svce_new()
+SvcEntry* sve_new()
 {
     SvcEntry *entry = malloc(sizeof(SvcEntry));
 
     entry->unit = cstr_new_size(32);
-    entry->sub = cstr_new_size(32);
+    entry->running = false;
     entry->description = cstr_new_size(32);
 
     return entry;
 }
 
-void svce_free(SvcEntry *entry)
+void sve_free(SvcEntry *entry)
 {
     if (!entry)
         return;
 
     cstr_free(entry->unit);
-    cstr_free(entry->sub);
     cstr_free(entry->description);
 
     free(entry);
 }
 
-bool svce_parse(SvcEntry *entry, CString *line)
+bool sve_parse(SvcEntry *entry, CString *line)
 {
     if (cstr_isempty(line))
         return false;
@@ -97,8 +86,8 @@ bool svce_parse(SvcEntry *entry, CString *line)
         }
         case 4:
         {
-            if (strcmp("exited", part) != 0)
-                cstr_copy(entry->sub, part);
+            if (strcmp("running", part) == 0)
+                entry->running = true;
             break;
         }
         }
@@ -117,67 +106,22 @@ bool svce_parse(SvcEntry *entry, CString *line)
     return true;
 }
 
-#if 0
-bool SvcEntry::writeHeaderTxt(CFile &outfile)
+void sve_print(SvcEntry *entry, CString *buffer)
 {
-    CString col;
+    cstr_ellipsize(buffer, c_str(entry->unit), 20);
+    printf("%s", c_str(buffer));
 
-    col = "Unit";
-    strPadRight(col, COL_UNIT, ' ');
-    outfile << col;
+    if (entry->running)
+        cstr_ellipsize(buffer, "running", 7);
+    else
+        cstr_ellipsize(buffer, "       ", 7);
+    printf(" %s", c_str(buffer));
 
-    outfile << SEP_SPACE;
+    cstr_ellipsize(buffer, c_str(entry->description), 30);
+    printf(" %s", c_str(buffer));
 
-    col = "Sub";
-    strPadRight(col, COL7, ' ');
-    outfile << col;
-
-    outfile << SEP_SPACE;
-
-    outfile << "Description";
-
-    outfile << "\n";
-
-    return true;
+    printf("\n");
 }
-
-bool SvcEntry::writeLineTxt(CFile &outfile)
-{
-    strEllipsize(unit, COL_UNIT, "+");
-    strPadRight(unit, COL_UNIT, ' ');
-    outfile << unit;
-
-    outfile << SEP_SPACE;
-
-    strEllipsize(sub, COL7, "+");
-    strPadRight(sub, COL7, ' ');
-    outfile << sub;
-
-    outfile << SEP_SPACE;
-
-    outfile << description;
-
-    outfile << "\n";
-
-    return true;
-}
-
-//bool SvcEntry::writeLineCsv(CFile &outfile)
-//{
-//    outfile << unit;
-//    outfile << SEP_TAB;
-//    outfile << user;
-//    outfile << SEP_TAB;
-//    outfile << pid;
-//    outfile << SEP_TAB;
-//    outfile << command;
-
-//    outfile << "\n";
-
-//    return true;
-//}
-
-#endif
 
 // SvcList --------------------------------------------------------------------
 
@@ -186,16 +130,16 @@ struct _SvcList
     CList *entryList;
 };
 
-SvcList* svcl_new()
+SvcList* svl_new()
 {
     SvcList *list = malloc(sizeof(SvcList));
 
-    list->entryList = clist_new(64, (CDeleteFunc) svce_free);
+    list->entryList = clist_new(64, (CDeleteFunc) sve_free);
 
     return list;
 }
 
-void svcl_free(SvcList *list)
+void svl_free(SvcList *list)
 {
     if (!list)
         return;
@@ -208,10 +152,10 @@ void svcl_free(SvcList *list)
 #define SvcListAuto GC_CLEANUP(_freeSvcList) SvcList
 GC_UNUSED static inline void _freeSvcList(SvcList **obj)
 {
-    svcl_free(*obj);
+    svl_free(*obj);
 }
 
-bool svcl_query(SvcList *list)
+bool svl_query(SvcList *list)
 {
     CStringAuto *cmd = cstr_new("systemctl --no-pager list-units --type=service");
 
@@ -245,15 +189,13 @@ bool svcl_query(SvcList *list)
         if (!cstr_startswith(line, "  ", true))
             continue;
 
-        SvcEntry *entry = svce_new();
+        SvcEntry *entry = sve_new();
 
-        if (!svce_parse(entry, line))
+        if (!sve_parse(entry, line))
         {
-            svce_free(entry);
+            sve_free(entry);
             continue;
         }
-
-        print(c_str(entry->unit));
 
         clist_append(list->entryList, entry);
     }
@@ -261,7 +203,7 @@ bool svcl_query(SvcList *list)
     return true;
 }
 
-bool svcl_print(SvcList *list)
+bool svl_print(SvcList *list)
 {
     CStringAuto *buff = cstr_new_size(64);
 
@@ -271,16 +213,7 @@ bool svcl_print(SvcList *list)
     {
         SvcEntry *entry = (SvcEntry*) clist_at(list->entryList, i);
 
-        cstr_ellipsize(buff, c_str(entry->unit), 17);
-        printf("%s", c_str(buff));
-
-        cstr_ellipsize(buff, c_str(entry->sub), 17);
-        printf(" %s", c_str(buff));
-
-        cstr_ellipsize(buff, c_str(entry->description), 17);
-        printf(" %s", c_str(buff));
-
-        printf("\n");
+        sve_print(entry, buff);
     }
 
     return true;
@@ -288,10 +221,10 @@ bool svcl_print(SvcList *list)
 
 bool svc_query()
 {
-    SvcListAuto *list = svcl_new();
+    SvcListAuto *list = svl_new();
 
-    svcl_query(list);
-    svcl_print(list);
+    svl_query(list);
+    svl_print(list);
 
     return true;
 }
