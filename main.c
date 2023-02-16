@@ -1,5 +1,6 @@
-#include <query.h>
+#include <pkg_dev.h>
 #include <prc_query.h>
+#include <svc_query.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +20,7 @@ static int _app_exit(bool usage, int ret)
 
 int main(int argc, char **argv)
 {
-    //return prc_query();
+    return svc_query();
 
     if (argc < 2)
         return _app_exit(true, EXIT_FAILURE);

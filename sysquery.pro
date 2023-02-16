@@ -10,14 +10,18 @@ PKGCONFIG += tinyc
 #PKGCONFIG += glib-2.0
 
 HEADERS = \
+    pkg_dev.h \
     prc_query.h \
-    query.h
+    str_ext.h \
+    svc_query.h
 
 SOURCES = \
     0Temp.c \
     main.c \
+    pkg_dev.c \
     prc_query.c \
-    query.c
+    str_ext.c \
+    svc_query.c
 
 DISTFILES = \
     install.sh \

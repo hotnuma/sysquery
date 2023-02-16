@@ -21,8 +21,10 @@ app_deps = [
 
 app_src = [
     'main.c',
+    'pkg_dev.c',
     'prc_query.c',
-    'query.c',
+    'str_ext.c',
+    'svc_query.c',
 ]
 
 executable(
