@@ -20,7 +20,7 @@ static int _app_exit(bool usage, int ret)
 
 int main(int argc, char **argv)
 {
-    return svc_query();
+    //return svc_query();
 
     if (argc < 2)
         return _app_exit(true, EXIT_FAILURE);
@@ -38,6 +38,10 @@ int main(int argc, char **argv)
         else if (strcmp(part, "-prc") == 0)
         {
             return (prc_query() == true ? EXIT_SUCCESS : EXIT_FAILURE);
+        }
+        else if (strcmp(part, "-svc") == 0)
+        {
+            return (svc_query() == true ? EXIT_SUCCESS : EXIT_FAILURE);
         }
         else
         {

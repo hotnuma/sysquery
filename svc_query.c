@@ -108,7 +108,7 @@ bool sve_parse(SvcEntry *entry, CString *line)
 
 void sve_print(SvcEntry *entry, CString *buffer)
 {
-    cstr_ellipsize(buffer, c_str(entry->unit), 20);
+    cstr_ellipsize(buffer, c_str(entry->unit), 26);
     printf("%s", c_str(buffer));
 
     if (entry->running)
@@ -117,7 +117,7 @@ void sve_print(SvcEntry *entry, CString *buffer)
         cstr_ellipsize(buffer, "       ", 7);
     printf(" %s", c_str(buffer));
 
-    cstr_ellipsize(buffer, c_str(entry->description), 30);
+    cstr_ellipsize(buffer, c_str(entry->description), 40);
     printf(" %s", c_str(buffer));
 
     printf("\n");
@@ -213,7 +213,16 @@ bool svl_print(SvcList *list)
     {
         SvcEntry *entry = (SvcEntry*) clist_at(list->entryList, i);
 
-        sve_print(entry, buff);
+        if (entry->running)
+            sve_print(entry, buff);
+    }
+
+    for (int i = 0; i < size; ++i)
+    {
+        SvcEntry *entry = (SvcEntry*) clist_at(list->entryList, i);
+
+        if (!entry->running)
+            sve_print(entry, buff);
     }
 
     return true;
