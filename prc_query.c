@@ -30,6 +30,8 @@ bool pitem_parse_mem(PrcItem *item);
 static long _read_mem(char *line);
 bool pitem_parse_status(PrcItem *item);
 void _pitem_get_uid_name(PrcItem *item);
+bool pitem_is(PrcItem *item, const char *name);
+void pitem_merge(PrcItem *item, PrcItem *other);
 
 // PrcList --------------------------------------------------------------------
 
@@ -62,6 +64,8 @@ struct _PrcItem
     long swap;
 
     long total;
+
+    int count;
 };
 
 PrcItem* pitem_new(long pid)
@@ -82,6 +86,8 @@ PrcItem* pitem_new(long pid)
     item->swap = 0;
 
     item->total = 0;
+
+    item->count = 0;
 
     return item;
 }
@@ -290,6 +296,31 @@ void _pitem_get_uid_name(PrcItem *item)
     cstr_copy(item->uid_name, pw->pw_name);
 }
 
+bool pitem_is(PrcItem *item, const char *name)
+{
+    return (strcmp(c_str(item->name), name) == 0);
+}
+
+void pitem_merge(PrcItem *item, PrcItem *other)
+{
+    //item->pid = pid;
+    //item->cmdline = cstr_new_size(256);
+    //item->prpath = cstr_new_size(64);
+    //item->name = cstr_new_size(24);
+
+    //item->uid = 0;
+    //item->uid_name = cstr_new_size(24);
+
+    item->priv += other->priv;
+    item->shared += other->shared;
+    item->shared_huge += other->shared_huge;
+    item->swap += other->swap;
+
+    item->total += other->total;
+
+    ++item->count;
+}
+
 // PrcList --------------------------------------------------------------------
 
 static int _pi_cmpmem(void *entry1, void *entry2)
@@ -373,6 +404,8 @@ bool plist_parse(PrcList *list)
 
 bool plist_append(PrcList *list, long pid)
 {
+    bool merge = true;
+
     PrcItem *item = pitem_new(pid);
 
     if (!pitem_parse_cmd(item))
@@ -392,6 +425,21 @@ bool plist_append(PrcList *list, long pid)
     }
 
     pitem_parse_status(item);
+
+    if (merge)
+    {
+        if (pitem_is(item, "firefox"))
+        {
+            PrcItem *found = plist_find(list, "firefox");
+
+            if (found)
+            {
+                pitem_merge(found, item);
+                pitem_free(item);
+                return true;
+            }
+        }
+    }
 
     clist_append(list->list, item);
 
