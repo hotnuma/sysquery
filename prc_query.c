@@ -20,22 +20,6 @@
 bool _have_pss = false;
 bool _have_swap_pss = false;
 
-// MemItem --------------------------------------------------------------------
-
-typedef struct _MemItem MemItem;
-MemItem* mitem_new(const char *name);
-void mitem_free(MemItem *item);
-
-// MemList --------------------------------------------------------------------
-
-typedef struct _MemList MemList;
-MemList* mlist_new();
-void mlist_free(MemList *list);
-int mlist_size(MemList *list);
-MemItem* mlist_at(MemList *list, int i);
-MemItem* mlist_get_item(MemList *list, const char *name, bool *exists);
-void mlist_print(MemList *list);
-
 // PrcItem --------------------------------------------------------------------
 
 typedef struct _PrcItem PrcItem;
@@ -45,7 +29,7 @@ bool pitem_parse_cmd(PrcItem *item);
 bool pitem_parse_mem(PrcItem *item);
 static long _read_mem(char *line);
 bool pitem_parse_status(PrcItem *item);
-void pitem_get_uid_name(PrcItem *item);
+void _pitem_get_uid_name(PrcItem *item);
 
 // PrcList --------------------------------------------------------------------
 
@@ -56,159 +40,8 @@ int plist_size(PrcList *list);
 PrcItem* plist_at(PrcList *list, int i);
 bool plist_parse(PrcList *list);
 bool plist_append(PrcList *list, long pid);
+PrcItem* plist_find(PrcList *list, const char *name);
 void plist_print(PrcList *list);
-
-
-// MemItem --------------------------------------------------------------------
-
-struct _MemItem
-{
-    CString *name;
-
-    int pid;
-    CString *uid_name;
-
-    long priv;
-    long shared;
-    long shared_huge;
-    long swap;
-
-    long total;
-
-    int count;
-};
-
-MemItem* mitem_new(const char *name)
-{
-    MemItem *item = (MemItem*) malloc(sizeof(MemItem));
-
-    item->name = cstr_new(name);
-
-    item->pid = 0;
-    item->uid_name = cstr_new_size(24);
-
-    item->priv = 0;
-    item->shared = 0;
-    item->shared_huge = 0;
-    item->swap = 0;
-
-    item->total = 0;
-
-    item->count = 0;
-
-    return item;
-}
-
-void mitem_free(MemItem *item)
-{
-    if (!item)
-        return;
-
-    cstr_free(item->name);
-    free(item);
-}
-
-
-// MemList --------------------------------------------------------------------
-
-static int _mitem_compare_mem(void *entry1, void *entry2)
-{
-    MemItem *e1 = *((MemItem**) entry1);
-    MemItem *e2 = *((MemItem**) entry2);
-
-    return (e2->total - e1->total);
-}
-
-struct _MemList
-{
-    CList *list;
-
-};
-
-MemList* mlist_new()
-{
-    MemList *list = (MemList*) malloc(sizeof(MemList));
-
-    list->list = clist_new(64, (CDeleteFunc) mitem_free);
-
-    return list;
-}
-
-void mlist_free(MemList *list)
-{
-    if (!list)
-        return;
-
-    clist_free(list->list);
-    free(list);
-}
-
-int mlist_size(MemList *list)
-{
-    return clist_size(list->list);
-}
-
-MemItem* mlist_at(MemList *list, int i)
-{
-    return (MemItem*) clist_at(list->list, i);
-}
-
-MemItem* mlist_get_item(MemList *list, const char *name, bool *exists)
-{
-    *exists = false;
-
-    int size = clist_size(list->list);
-
-    for (int i = 0; i < size; ++i)
-    {
-        MemItem *item = (MemItem*) clist_at(list->list, i);
-
-        if (strcmp(c_str(item->name), name) == 0)
-        {
-            *exists = true;
-            return item;
-        }
-    }
-
-    MemItem *item = mitem_new(name);
-    clist_append(list->list, item);
-
-    return item;
-}
-
-void mlist_print(MemList *list)
-{
-    clist_sort(list->list, (CCompareFunc) _mitem_compare_mem);
-
-    long total = 0;
-
-    int size = mlist_size(list);
-
-    for (int i = 0; i < size; ++i)
-    {
-        MemItem *item = mlist_at(list, i);
-
-        if (item->count > 1)
-        {
-            print("%s(%d)\t%d\t%s\t%ld", c_str(item->name), item->count,
-                                     item->pid,
-                                     c_str(item->uid_name),
-                                     item->total);
-        }
-        else
-        {
-            print("%s\t%d\t%s\t%ld", c_str(item->name),
-                                 item->pid,
-                                 c_str(item->uid_name),
-                                 item->total);
-        }
-
-        total += item->total;
-    }
-
-    print("total : %ld", total);
-}
-
 
 // PrcItem --------------------------------------------------------------------
 
@@ -433,7 +266,7 @@ bool pitem_parse_status(PrcItem *item)
                             &dummy,
                             &dummy) == 4)
         {
-            pitem_get_uid_name(item);
+            _pitem_get_uid_name(item);
 
             //print(c_str(item->uid_name));
 
@@ -444,7 +277,7 @@ bool pitem_parse_status(PrcItem *item)
     return true;
 }
 
-void pitem_get_uid_name(PrcItem *item)
+void _pitem_get_uid_name(PrcItem *item)
 {
     struct passwd *pw = getpwuid(item->uid);
 
@@ -456,7 +289,6 @@ void pitem_get_uid_name(PrcItem *item)
 
     cstr_copy(item->uid_name, pw->pw_name);
 }
-
 
 // PrcList --------------------------------------------------------------------
 
@@ -471,8 +303,7 @@ static int _pi_cmpmem(void *entry1, void *entry2)
 struct _PrcList
 {
     CList *list;
-    MemList *memlist;
-
+    //MemList *memlist;
 };
 
 #define PrcListAuto GC_CLEANUP(_freePrcList) PrcList
@@ -486,7 +317,7 @@ PrcList* plist_new()
     PrcList *list = (PrcList*) malloc(sizeof(PrcList));
 
     list->list = clist_new(64, (CDeleteFunc) pitem_free);
-    list->memlist = mlist_new();
+    //list->memlist = mlist_new();
 
     return list;
 }
@@ -497,7 +328,7 @@ void plist_free(PrcList *list)
         return;
 
     clist_free(list->list);
-    mlist_free(list->memlist);
+    //mlist_free(list->memlist);
 
     free(list);
 }
@@ -562,31 +393,26 @@ bool plist_append(PrcList *list, long pid)
 
     pitem_parse_status(item);
 
-    bool exists = false;
-    MemItem *memitem = mlist_get_item(list->memlist,
-                                      c_str(item->name),
-                                      &exists);
-
-    if (!exists)
-    {
-        memitem->pid = item->pid;
-        cstr_copy(memitem->uid_name, c_str(item->uid_name));
-    }
-
-    assert(memitem != NULL);
-
-    memitem->priv += item->priv;
-    memitem->shared += item->shared;
-    memitem->shared_huge += item->shared_huge;
-    memitem->swap += item->swap;
-
-    memitem->total += item->total;
-
-    memitem->count += 1;
-
     clist_append(list->list, item);
 
     return true;
+}
+
+PrcItem* plist_find(PrcList *list, const char *name)
+{
+    PrcItem *item = NULL;
+
+    int size = clist_size(list->list);
+
+    for (int i = 0; i < size; ++i)
+    {
+        PrcItem *item = (PrcItem*) clist_at(list->list, i);
+
+        if (strcmp(c_str(item->name), name) == 0)
+            return item;
+    }
+
+    return item;
 }
 
 void plist_print(PrcList *list)
@@ -604,7 +430,7 @@ void plist_print(PrcList *list)
         PrcItem *item = plist_at(list, i);
 
         // name
-        cstr_ellipsize(buff, c_str(item->name), 17);
+        cstr_ellipsize(buff, c_str(item->name), 22);
         printf("%s", c_str(buff));
 
         cstr_long(buff, item->pid, 7);
@@ -624,16 +450,12 @@ void plist_print(PrcList *list)
     print("total : %ld", total);
 }
 
-
 // Query ----------------------------------------------------------------------
 
 bool prc_query()
 {
     PrcListAuto *list = plist_new();
-
     plist_parse(list);
-
-    //mlist_print(list->memlist);
     plist_print(list);
 
     return true;
