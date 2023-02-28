@@ -58,10 +58,10 @@ struct _PrcItem
     unsigned int uid;
     CString *uid_name;
 
-    long priv;
-    long shared;
-    long shared_huge;
-    long swap;
+//    long priv;
+//    long shared;
+//    long shared_huge;
+//    long swap;
 
     long total;
 
@@ -80,14 +80,14 @@ PrcItem* pitem_new(long pid)
     item->uid = 0;
     item->uid_name = cstr_new_size(24);
 
-    item->priv = 0;
-    item->shared = 0;
-    item->shared_huge = 0;
-    item->swap = 0;
+//    item->priv = 0;
+//    item->shared = 0;
+//    item->shared_huge = 0;
+//    item->swap = 0;
 
     item->total = 0;
 
-    item->count = 0;
+    item->count = 1;
 
     return item;
 }
@@ -155,13 +155,18 @@ bool pitem_parse_mem(PrcItem *item)
 
     file_read(buffer, c_str(filepath));
 
-    long private_huge = 0;
-    long pss = 0;
-    long swap_pss = 0;
+    long mem_priv_huge = 0;
+    long mem_pss = 0;
+    long mem_swap_pss = 0;
 
     char *ptr = c_str(buffer);
     char *line;
     int length;
+
+    long mem_priv = 0;
+    long mem_shared = 0;
+    long mem_shared_huge = 0;
+    long mem_swap = 0;
 
     while (str_getlineptr(&ptr, &line, &length))
     {
@@ -171,25 +176,25 @@ bool pitem_parse_mem(PrcItem *item)
         {
             long val = _read_mem(line);
             if (val > 0)
-                private_huge += val;
+                mem_priv_huge += val;
         }
         else if (str_startswith(line, "Shared_Hugetlb:", true))
         {
             long val = _read_mem(line);
             if (val > 0)
-                item->shared_huge += val;
+                mem_shared_huge += val;
         }
         else if (str_startswith(line, "Shared", true))
         {
             long val = _read_mem(line);
             if (val > 0)
-                item->shared += val;
+                mem_shared += val;
         }
         else if (str_startswith(line, "Private", true))
         {
             long val = _read_mem(line);
             if (val > 0)
-                item->priv += val;
+                mem_priv += val;
         }
         else if (str_startswith(line, "Pss:", true))
         {
@@ -197,13 +202,13 @@ bool pitem_parse_mem(PrcItem *item)
 
             long val = _read_mem(line);
             if (val > 0)
-                pss += val;
+                mem_pss += val;
         }
         else if (str_startswith(line, "Swap:", true))
         {
             long val = _read_mem(line);
             if (val > 0)
-                item->swap += val;
+                mem_swap += val;
         }
         else if (str_startswith(line, "SwapPss:", true))
         {
@@ -211,19 +216,19 @@ bool pitem_parse_mem(PrcItem *item)
 
             long val = _read_mem(line);
             if (val > 0)
-                swap_pss += val;
+                mem_swap_pss += val;
         }
     }
 
     if (_have_pss)
-        item->shared = pss - item->priv;
+        mem_shared = mem_pss - mem_priv;
 
-    item->priv += private_huge;
+    mem_priv += mem_priv_huge;
 
     if (_have_swap_pss)
-        item->swap = swap_pss;
+        mem_swap = mem_swap_pss;
 
-    item->total = item->priv + item->shared + item->shared_huge;
+    item->total = mem_priv + mem_shared + mem_shared_huge;
 
     return true;
 }
@@ -303,18 +308,10 @@ bool pitem_is(PrcItem *item, const char *name)
 
 void pitem_merge(PrcItem *item, PrcItem *other)
 {
-    //item->pid = pid;
-    //item->cmdline = cstr_new_size(256);
-    //item->prpath = cstr_new_size(64);
-    //item->name = cstr_new_size(24);
-
-    //item->uid = 0;
-    //item->uid_name = cstr_new_size(24);
-
-    item->priv += other->priv;
-    item->shared += other->shared;
-    item->shared_huge += other->shared_huge;
-    item->swap += other->swap;
+//    item->priv += other->priv;
+//    item->shared += other->shared;
+//    item->shared_huge += other->shared_huge;
+//    item->swap += other->swap;
 
     item->total += other->total;
 
@@ -334,7 +331,7 @@ static int _pi_cmpmem(void *entry1, void *entry2)
 struct _PrcList
 {
     CList *list;
-    //MemList *memlist;
+    bool merge;
 };
 
 #define PrcListAuto GC_CLEANUP(_freePrcList) PrcList
@@ -348,7 +345,7 @@ PrcList* plist_new()
     PrcList *list = (PrcList*) malloc(sizeof(PrcList));
 
     list->list = clist_new(64, (CDeleteFunc) pitem_free);
-    //list->memlist = mlist_new();
+    list->merge = true;
 
     return list;
 }
@@ -359,7 +356,6 @@ void plist_free(PrcList *list)
         return;
 
     clist_free(list->list);
-    //mlist_free(list->memlist);
 
     free(list);
 }
@@ -404,8 +400,6 @@ bool plist_parse(PrcList *list)
 
 bool plist_append(PrcList *list, long pid)
 {
-    bool merge = true;
-
     PrcItem *item = pitem_new(pid);
 
     if (!pitem_parse_cmd(item))
@@ -426,18 +420,15 @@ bool plist_append(PrcList *list, long pid)
 
     pitem_parse_status(item);
 
-    if (merge)
+    if (list->merge)
     {
-        if (pitem_is(item, "firefox"))
-        {
-            PrcItem *found = plist_find(list, "firefox");
+        PrcItem *found = plist_find(list, c_str(item->name));
 
-            if (found)
-            {
-                pitem_merge(found, item);
-                pitem_free(item);
-                return true;
-            }
+        if (found)
+        {
+            pitem_merge(found, item);
+            pitem_free(item);
+            return true;
         }
     }
 
@@ -480,6 +471,19 @@ void plist_print(PrcList *list)
         // name
         cstr_ellipsize(buff, c_str(item->name), 22);
         printf("%s", c_str(buff));
+
+        if (list->merge)
+        {
+            if (item->count > 1)
+            {
+                cstr_long(buff, item->count, 2);
+                printf(" %s", c_str(buff));
+            }
+            else
+            {
+                printf("   ");
+            }
+        }
 
         cstr_long(buff, item->pid, 7);
         printf(" %s", c_str(buff));
