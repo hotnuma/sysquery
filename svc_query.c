@@ -14,18 +14,18 @@
 // SvcEntry -------------------------------------------------------------------
 
 typedef struct _SvcEntry SvcEntry;
-SvcEntry* sve_new();
-void sve_free(SvcEntry *entry);
-bool sve_parse(SvcEntry *entry, CString *line);
-void sve_print(SvcEntry *entry, CString *buffer);
+SvcEntry* svitem_new();
+void svitem_free(SvcEntry *entry);
+bool svitem_parse(SvcEntry *entry, CString *line);
+void svitem_print(SvcEntry *entry, CString *buffer);
 
 // SvcList --------------------------------------------------------------------
 
 typedef struct _SvcList SvcList;
-SvcList* svl_new();
-void svl_free(SvcList *list);
-bool svl_query(SvcList *list);
-bool svl_print(SvcList *list);
+SvcList* svlist_new();
+void svlist_free(SvcList *list);
+bool svlist_query(SvcList *list);
+bool svlist_print(SvcList *list);
 
 // SvcEntry -------------------------------------------------------------------
 
@@ -36,7 +36,7 @@ struct _SvcEntry
     CString *description;
 };
 
-SvcEntry* sve_new()
+SvcEntry* svitem_new()
 {
     SvcEntry *entry = malloc(sizeof(SvcEntry));
 
@@ -47,7 +47,7 @@ SvcEntry* sve_new()
     return entry;
 }
 
-void sve_free(SvcEntry *entry)
+void svitem_free(SvcEntry *entry)
 {
     if (!entry)
         return;
@@ -58,7 +58,7 @@ void sve_free(SvcEntry *entry)
     free(entry);
 }
 
-bool sve_parse(SvcEntry *entry, CString *line)
+bool svitem_parse(SvcEntry *entry, CString *line)
 {
     if (cstr_isempty(line))
         return false;
@@ -106,7 +106,7 @@ bool sve_parse(SvcEntry *entry, CString *line)
     return true;
 }
 
-void sve_print(SvcEntry *entry, CString *buffer)
+void svitem_print(SvcEntry *entry, CString *buffer)
 {
     cstr_ellipsize(buffer, c_str(entry->unit), 26);
     printf("%s", c_str(buffer));
@@ -130,16 +130,16 @@ struct _SvcList
     CList *entryList;
 };
 
-SvcList* svl_new()
+SvcList* svlist_new()
 {
     SvcList *list = malloc(sizeof(SvcList));
 
-    list->entryList = clist_new(64, (CDeleteFunc) sve_free);
+    list->entryList = clist_new(64, (CDeleteFunc) svitem_free);
 
     return list;
 }
 
-void svl_free(SvcList *list)
+void svlist_free(SvcList *list)
 {
     if (!list)
         return;
@@ -152,12 +152,12 @@ void svl_free(SvcList *list)
 #define SvcListAuto GC_CLEANUP(_freeSvcList) SvcList
 GC_UNUSED static inline void _freeSvcList(SvcList **obj)
 {
-    svl_free(*obj);
+    svlist_free(*obj);
 }
 
-bool svl_query(SvcList *list)
+bool svlist_query(SvcList *list)
 {
-    CStringAuto *cmd = cstr_new("systemctl --no-pager list-units --type=service");
+    CStringAuto *cmd = cstr_new("systemctl list-units --no-pager --type=service");
 
     CProcessAuto *cpr = cprocess_new();
 
@@ -189,11 +189,11 @@ bool svl_query(SvcList *list)
         if (!cstr_startswith(line, "  ", true))
             continue;
 
-        SvcEntry *entry = sve_new();
+        SvcEntry *entry = svitem_new();
 
-        if (!sve_parse(entry, line))
+        if (!svitem_parse(entry, line))
         {
-            sve_free(entry);
+            svitem_free(entry);
             continue;
         }
 
@@ -203,7 +203,7 @@ bool svl_query(SvcList *list)
     return true;
 }
 
-bool svl_print(SvcList *list)
+bool svlist_print(SvcList *list)
 {
     CStringAuto *buff = cstr_new_size(64);
 
@@ -214,7 +214,7 @@ bool svl_print(SvcList *list)
         SvcEntry *entry = (SvcEntry*) clist_at(list->entryList, i);
 
         if (entry->running)
-            sve_print(entry, buff);
+            svitem_print(entry, buff);
     }
 
     for (int i = 0; i < size; ++i)
@@ -222,7 +222,7 @@ bool svl_print(SvcList *list)
         SvcEntry *entry = (SvcEntry*) clist_at(list->entryList, i);
 
         if (!entry->running)
-            sve_print(entry, buff);
+            svitem_print(entry, buff);
     }
 
     return true;
@@ -230,10 +230,10 @@ bool svl_print(SvcList *list)
 
 bool svc_query()
 {
-    SvcListAuto *list = svl_new();
+    SvcListAuto *list = svlist_new();
 
-    svl_query(list);
-    svl_print(list);
+    svlist_query(list);
+    svlist_print(list);
 
     return true;
 }

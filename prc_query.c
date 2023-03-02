@@ -23,27 +23,27 @@ bool _have_swap_pss = false;
 // PrcItem --------------------------------------------------------------------
 
 typedef struct _PrcItem PrcItem;
-PrcItem* pitem_new(long pid);
-void pitem_free(PrcItem *item);
-bool pitem_parse_cmd(PrcItem *item);
-bool pitem_parse_mem(PrcItem *item);
+PrcItem* pritem_new(long pid);
+void pritem_free(PrcItem *item);
+bool pritem_parse_cmd(PrcItem *item);
+bool pritem_parse_mem(PrcItem *item);
 static long _read_mem(char *line);
-bool pitem_parse_status(PrcItem *item);
-void _pitem_get_uid_name(PrcItem *item);
-bool pitem_is(PrcItem *item, const char *name);
-void pitem_merge(PrcItem *item, PrcItem *other);
+bool pritem_parse_status(PrcItem *item);
+void _pritem_get_uid_name(PrcItem *item);
+bool pritem_is(PrcItem *item, const char *name);
+void pritem_merge(PrcItem *item, PrcItem *other);
 
 // PrcList --------------------------------------------------------------------
 
 typedef struct _PrcList PrcList;
-PrcList* plist_new();
-void plist_free(PrcList *list);
-int plist_size(PrcList *list);
-PrcItem* plist_at(PrcList *list, int i);
-bool plist_parse(PrcList *list);
-bool plist_append(PrcList *list, long pid);
-PrcItem* plist_find(PrcList *list, const char *name);
-void plist_print(PrcList *list);
+PrcList* prlist_new();
+void prlist_free(PrcList *list);
+int prlist_size(PrcList *list);
+PrcItem* prlist_at(PrcList *list, int i);
+bool prlist_parse(PrcList *list);
+bool prlist_append(PrcList *list, long pid);
+PrcItem* prlist_find(PrcList *list, const char *name);
+void prlist_print(PrcList *list);
 
 // PrcItem --------------------------------------------------------------------
 
@@ -68,7 +68,7 @@ struct _PrcItem
     int count;
 };
 
-PrcItem* pitem_new(long pid)
+PrcItem* pritem_new(long pid)
 {
     PrcItem *item = (PrcItem*) malloc(sizeof(PrcItem));
 
@@ -92,7 +92,7 @@ PrcItem* pitem_new(long pid)
     return item;
 }
 
-void pitem_free(PrcItem *item)
+void pritem_free(PrcItem *item)
 {
     if (!item)
         return;
@@ -105,7 +105,7 @@ void pitem_free(PrcItem *item)
     free(item);
 }
 
-bool pitem_parse_cmd(PrcItem *item)
+bool pritem_parse_cmd(PrcItem *item)
 {
     CStringAuto *filepath = cstr_new_size(32);
     cstr_fmt(filepath, "/proc/%ld/cmdline", item->pid);
@@ -143,7 +143,7 @@ bool pitem_parse_cmd(PrcItem *item)
     return true;
 }
 
-bool pitem_parse_mem(PrcItem *item)
+bool pritem_parse_mem(PrcItem *item)
 {
     CStringAuto *filepath = cstr_new_size(32);
     cstr_fmt(filepath, "/proc/%ld/smaps_rollup", item->pid);
@@ -248,7 +248,7 @@ static long _read_mem(char *line)
     return strtol(p, NULL, 10);
 }
 
-bool pitem_parse_status(PrcItem *item)
+bool pritem_parse_status(PrcItem *item)
 {
     CStringAuto *filepath = cstr_new_size(32);
     cstr_fmt(filepath, "/proc/%d/status", item->pid);
@@ -277,7 +277,7 @@ bool pitem_parse_status(PrcItem *item)
                             &dummy,
                             &dummy) == 4)
         {
-            _pitem_get_uid_name(item);
+            _pritem_get_uid_name(item);
 
             //print(c_str(item->uid_name));
 
@@ -288,7 +288,7 @@ bool pitem_parse_status(PrcItem *item)
     return true;
 }
 
-void _pitem_get_uid_name(PrcItem *item)
+void _pritem_get_uid_name(PrcItem *item)
 {
     struct passwd *pw = getpwuid(item->uid);
 
@@ -301,12 +301,12 @@ void _pitem_get_uid_name(PrcItem *item)
     cstr_copy(item->uid_name, pw->pw_name);
 }
 
-bool pitem_is(PrcItem *item, const char *name)
+bool pritem_is(PrcItem *item, const char *name)
 {
     return (strcmp(c_str(item->name), name) == 0);
 }
 
-void pitem_merge(PrcItem *item, PrcItem *other)
+void pritem_merge(PrcItem *item, PrcItem *other)
 {
 //    item->priv += other->priv;
 //    item->shared += other->shared;
@@ -337,20 +337,20 @@ struct _PrcList
 #define PrcListAuto GC_CLEANUP(_freePrcList) PrcList
 GC_UNUSED static inline void _freePrcList(PrcList **obj)
 {
-    plist_free(*obj);
+    prlist_free(*obj);
 }
 
-PrcList* plist_new()
+PrcList* prlist_new()
 {
     PrcList *list = (PrcList*) malloc(sizeof(PrcList));
 
-    list->list = clist_new(64, (CDeleteFunc) pitem_free);
+    list->list = clist_new(64, (CDeleteFunc) pritem_free);
     list->merge = true;
 
     return list;
 }
 
-void plist_free(PrcList *list)
+void prlist_free(PrcList *list)
 {
     if (!list)
         return;
@@ -360,17 +360,17 @@ void plist_free(PrcList *list)
     free(list);
 }
 
-int plist_size(PrcList *list)
+int prlist_size(PrcList *list)
 {
     return clist_size(list->list);
 }
 
-PrcItem* plist_at(PrcList *list, int i)
+PrcItem* prlist_at(PrcList *list, int i)
 {
     return (PrcItem*) clist_at(list->list, i);
 }
 
-bool plist_parse(PrcList *list)
+bool prlist_parse(PrcList *list)
 {
     const char *procdir = "/proc";
 
@@ -392,42 +392,42 @@ bool plist_parse(PrcList *list)
         if (*endptr != '\0')
             continue;
 
-        plist_append(list, pid);
+        prlist_append(list, pid);
     }
 
     return true;
 }
 
-bool plist_append(PrcList *list, long pid)
+bool prlist_append(PrcList *list, long pid)
 {
-    PrcItem *item = pitem_new(pid);
+    PrcItem *item = pritem_new(pid);
 
-    if (!pitem_parse_cmd(item))
+    if (!pritem_parse_cmd(item))
     {
-        pitem_free(item);
+        pritem_free(item);
 
         return false;
     }
 
-    if (!pitem_parse_mem(item))
+    if (!pritem_parse_mem(item))
     {
         print("*** parsemem error");
 
-        pitem_free(item);
+        pritem_free(item);
 
         return false;
     }
 
-    pitem_parse_status(item);
+    pritem_parse_status(item);
 
     if (list->merge)
     {
-        PrcItem *found = plist_find(list, c_str(item->name));
+        PrcItem *found = prlist_find(list, c_str(item->name));
 
         if (found)
         {
-            pitem_merge(found, item);
-            pitem_free(item);
+            pritem_merge(found, item);
+            pritem_free(item);
             return true;
         }
     }
@@ -437,7 +437,7 @@ bool plist_append(PrcList *list, long pid)
     return true;
 }
 
-PrcItem* plist_find(PrcList *list, const char *name)
+PrcItem* prlist_find(PrcList *list, const char *name)
 {
     PrcItem *item = NULL;
 
@@ -454,7 +454,7 @@ PrcItem* plist_find(PrcList *list, const char *name)
     return item;
 }
 
-void plist_print(PrcList *list)
+void prlist_print(PrcList *list)
 {
     CStringAuto *buff = cstr_new_size(64);
 
@@ -462,11 +462,11 @@ void plist_print(PrcList *list)
 
     long total = 0;
 
-    int size = plist_size(list);
+    int size = prlist_size(list);
 
     for (int i = 0; i < size; ++i)
     {
-        PrcItem *item = plist_at(list, i);
+        PrcItem *item = prlist_at(list, i);
 
         // name
         cstr_ellipsize(buff, c_str(item->name), 22);
@@ -506,9 +506,9 @@ void plist_print(PrcList *list)
 
 bool prc_query()
 {
-    PrcListAuto *list = plist_new();
-    plist_parse(list);
-    plist_print(list);
+    PrcListAuto *list = prlist_new();
+    prlist_parse(list);
+    prlist_print(list);
 
     return true;
 }
