@@ -380,7 +380,7 @@ bool prlist_parse(PrcList *list)
 
     CStringAuto *dirname = cstr_new_size(16);
 
-    while (cdirparser_read(dir, dirname))
+    while (cdirparser_read(dir, dirname, NULL))
     {
         if (cstr_size(dirname) < 6)
             continue;
