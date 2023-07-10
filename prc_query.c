@@ -58,13 +58,7 @@ struct _PrcItem
     unsigned int uid;
     CString *uid_name;
 
-//    long priv;
-//    long shared;
-//    long shared_huge;
-//    long swap;
-
     long total;
-
     int count;
 };
 
@@ -80,13 +74,7 @@ PrcItem* pritem_new(long pid)
     item->uid = 0;
     item->uid_name = cstr_new_size(24);
 
-//    item->priv = 0;
-//    item->shared = 0;
-//    item->shared_huge = 0;
-//    item->swap = 0;
-
     item->total = 0;
-
     item->count = 1;
 
     return item;
@@ -308,13 +296,7 @@ bool pritem_is(PrcItem *item, const char *name)
 
 void pritem_merge(PrcItem *item, PrcItem *other)
 {
-//    item->priv += other->priv;
-//    item->shared += other->shared;
-//    item->shared_huge += other->shared_huge;
-//    item->swap += other->swap;
-
     item->total += other->total;
-
     ++item->count;
 }
 
@@ -461,6 +443,7 @@ void prlist_print(PrcList *list)
     clist_sort(list->list, (CCompareFunc) _pi_cmpmem);
 
     long total = 0;
+    int count = 0;
 
     int size = prlist_size(list);
 
@@ -471,6 +454,8 @@ void prlist_print(PrcList *list)
         // name
         cstr_ellipsize(buff, c_str(item->name), 22);
         printf("%s", c_str(buff));
+
+        count += item->count;
 
         if (list->merge)
         {
@@ -499,7 +484,7 @@ void prlist_print(PrcList *list)
         total += item->total;
     }
 
-    print("total : %ld", total);
+    print("total : %ld kB / %d prc", total, count);
 }
 
 // Query ----------------------------------------------------------------------
